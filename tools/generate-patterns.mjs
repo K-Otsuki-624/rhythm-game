@@ -8,6 +8,7 @@
 //   x = 音の頭(打つ)  - = 前の音の伸ばし  . = 休符
 // 使う音価: 4分・付点8分・8分・16分音符 / 8分・16分休符(4分休符は使わない)、8分三連符
 // 休符は拍の頭にだけ置く(音のあとに休符は入れず、次の音まで伸ばして書く)
+// ただし8分三連符は「8分3つ」だけで、3つの中のどこに休符が入ってもよい
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -28,8 +29,8 @@ function sixteenthCells() {
   rec('');
   return out;
 }
-// 8分三連符の1拍(x-- は4分音符と同じなので除外)
-const TRIPLET_CELLS = ['xxx', 'x-x', 'xx-', '.xx', '.x-'];
+// 8分三連符の1拍: 8分3つ(どこに休符が入ってもOK。伸ばす形は使わない)
+const TRIPLET_CELLS = ['xxx', 'xx.', 'x.x', 'x..', '.xx', '.x.', '..x'];
 
 function mulberry32(a) {
   return function () {
@@ -44,12 +45,15 @@ function mulberry32(a) {
 const DIFFICULTY = {
   'x---': 1, 'x-x-': 1, 'x--x': 2, 'xxxx': 2, 'x-xx': 2, 'xxx-': 2, 'xx--': 3, 'xx-x': 3,
   '..x-': 2, '..xx': 3, '.xxx': 3, '...x': 4, '.x-x': 4, '.x--': 4, '.xx-': 4,
-  'xxx': 2, 'x-x': 3, 'xx-': 3, '.xx': 4, '.x-': 4,
+  'xxx': 2, 'xx.': 3, 'x.x': 3, 'x..': 3, '.xx': 4, '.x.': 4, '..x': 4,
 };
-const isRest = (c) => c[0] === '.';
+const isRest = (c) => c.includes('.');
 const isTriplet = (c) => c.length === 3;
 // 出やすさ: 頭からリズムがある型を多めに。三連符は1パターンに1〜2拍くらい
-const weightOf = (c) => (isTriplet(c) ? 2 : 3) * (isRest(c) ? 1 / 3 : 1);
+const weightOf = (c) => {
+  if (isTriplet(c)) return c === 'xxx' ? 3 : 0.5; // 三連符は8分3つを中心に、休符入りは少なめ
+  return isRest(c) ? 1 : 3;
+};
 const diffOf = (p) => p.reduce((a, c) => a + DIFFICULTY[c], 0);
 const restsOf = (p) => p.filter(isRest).length;
 const tripletsOf = (p) => p.filter(isTriplet).length;
@@ -65,7 +69,7 @@ function okPattern(p, triplet) {
   const counts = {};
   p.forEach((c) => (counts[c] = (counts[c] || 0) + 1));
   if (Object.values(counts).some((n) => n >= 3)) return false; // 同じ拍が3回以上は単調
-  if (restsOf(p) > 2) return false;                            // 頭休符の拍は1パターン2つまで
+  if (restsOf(p) > 2) return false;                            // 休符入りの拍は1パターン2つまで
   if (triplet && (tripletsOf(p) < 1 || tripletsOf(p) > 2)) return false; // 三連符は1〜2拍
   return true;
 }
@@ -85,7 +89,7 @@ function generateLeft(cells, triplet, seed, count) {
   return list;
 }
 
-// 右手: 左手の各パターンと「難しさ合計」「頭休符の数」「三連符の数」が同じものを作る
+// 右手: 左手の各パターンと「難しさ合計」「休符入りの拍の数」「三連符の数」が同じものを作る
 // → 左右で難易度の分布がそろう
 function generateRight(cells, triplet, seed, left) {
   const rnd = mulberry32(seed);

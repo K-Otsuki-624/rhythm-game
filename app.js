@@ -1,4 +1,4 @@
-import { PATTERNS, CELL_DIFFICULTY } from './patterns.js?v=9';
+import { PATTERNS, CELL_DIFFICULTY } from './patterns.js?v=10';
 
 /* ============================================================
  * 設定の保存
