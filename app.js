@@ -1,4 +1,4 @@
-import { RIGHT_PATTERNS, LEFT_PATTERNS } from './patterns.js';
+import { RIGHT_PATTERNS, LEFT_PATTERNS } from './patterns.js?v=6';
 
 /* ============================================================
  * 設定の保存
@@ -614,7 +614,9 @@ $('btnDemo').addEventListener('click', () => (mode === 'demo' ? stopAll() : star
 $('btnChallenge').addEventListener('click', () => (mode === 'challenge' ? stopAll() : startRun('challenge')));
 
 const beatsSel = $('beats');
-for (let n = 4; n <= 20; n++) beatsSel.add(new Option(`${n}拍`, String(n)));
+if (beatsSel.options.length === 0) {
+  for (let n = 4; n <= 20; n++) beatsSel.add(new Option(`${n}拍`, String(n)));
+}
 settings.beats = Math.max(4, Math.min(20, Number(settings.beats) || 4));
 beatsSel.value = String(settings.beats);
 beatsSel.addEventListener('change', (e) => { settings.beats = Number(e.target.value); saveSettings(); newProblem(); });

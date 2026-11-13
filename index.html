@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#1e293b">
   <title>両手リズムチャレンジ</title>
-  <link rel="stylesheet" href="style.css">
+  <!-- 更新したら ?v= の数字を上げる(ブラウザに古いファイルが残るのを防ぐ。app.js 内の patterns.js も同様) -->
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -32,7 +33,25 @@
       <input id="bpmSlider" type="range" min="30" max="240" step="1" value="90" aria-label="テンポ">
       <div class="beats-row">
         <label for="beats">拍数</label>
-        <select id="beats"></select>
+        <select id="beats">
+          <option value="4" selected>4拍</option>
+          <option value="5">5拍</option>
+          <option value="6">6拍</option>
+          <option value="7">7拍</option>
+          <option value="8">8拍</option>
+          <option value="9">9拍</option>
+          <option value="10">10拍</option>
+          <option value="11">11拍</option>
+          <option value="12">12拍</option>
+          <option value="13">13拍</option>
+          <option value="14">14拍</option>
+          <option value="15">15拍</option>
+          <option value="16">16拍</option>
+          <option value="17">17拍</option>
+          <option value="18">18拍</option>
+          <option value="19">19拍</option>
+          <option value="20">20拍</option>
+        </select>
       </div>
 
       <div class="main-buttons">
@@ -93,6 +112,6 @@
     <button id="padR" class="pad pad-r" aria-label="右手"><span>右手</span><small>J</small></button>
   </footer>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=6"></script>
 </body>
 </html>
