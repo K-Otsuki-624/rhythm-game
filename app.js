@@ -391,9 +391,11 @@ function startRun(kind) {
     extra: { L: 0, R: 0 },
     end: t0 + nBeats * b,
     nBeats,
-    curRow: -1,
+    follow: scoreNeedsScroll(),
   };
-  scrollToRow(0);
+  // 収まらないときは最上部から。収まるときも楽譜が隠れていれば見える位置へ
+  const paperRect = document.getElementById('score').getBoundingClientRect();
+  if (run.follow || paperRect.top < 0 || paperRect.bottom > visibleHeight()) window.scrollTo(0, 0);
 
   startTimer(() => {
     if (!run) return;
@@ -406,16 +408,21 @@ function startRun(kind) {
   updateButtons();
 }
 
-// いま叩いている段と次の段が画面に入るようにスクロール
-function scrollToRow(r) {
-  if (!rowHl[r]) return;
-  const topLimit = 8;
-  const bottomLimit = document.querySelector('.pads').getBoundingClientRect().top - 8;
-  const cur = rowHl[r].getBoundingClientRect();
-  const next = rowHl[Math.min(r + 1, rows - 1)].getBoundingClientRect();
-  if (cur.top < topLimit || next.bottom > bottomLimit) {
-    window.scrollBy({ top: cur.top - topLimit - 4, behavior: 'smooth' });
-  }
+// 楽譜が画面(パッドより上)に収まるかどうか
+function visibleHeight() {
+  return window.innerHeight - document.querySelector('.pads').offsetHeight;
+}
+function scoreNeedsScroll() {
+  return document.getElementById('score').getBoundingClientRect().height > visibleHeight() - 16;
+}
+// 進行に合わせて少しずつスクロール(演奏中の位置を表示エリアの上から1/4あたりに保つ)
+function followScroll(pos) {
+  const paper = document.getElementById('score').getBoundingClientRect();
+  const scale = paper.height / svgH();
+  const y = window.scrollY + paper.top + (HEADER + Math.max(0, pos) * ROWH) * scale;
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  const target = Math.max(0, Math.min(max, y - visibleHeight() * 0.25));
+  if (Math.abs(target - window.scrollY) >= 0.5) window.scrollTo(0, target);
 }
 
 function frame() {
@@ -433,11 +440,7 @@ function frame() {
   }
   const pos = (now - t0) / b; // 本番内の拍位置
   for (let r = 0; r < rows; r++) rowHl[r].classList.toggle('on', pos >= r && pos < r + 1);
-  const curRow = Math.floor(pos);
-  if (curRow !== run.curRow && curRow >= 0 && curRow < run.nBeats) {
-    run.curRow = curRow;
-    scrollToRow(curRow);
-  }
+  if (run.follow && pos <= run.nBeats) followScroll(pos);
   for (const hand of HANDS) {
     const ph = playheads[hand];
     if (pos >= 0 && pos < run.nBeats) {
