@@ -1,4 +1,4 @@
-import { RIGHT_PATTERNS, LEFT_PATTERNS } from './patterns.js?v=7';
+import { RIGHT_PATTERNS, LEFT_PATTERNS, CELL_DIFFICULTY } from './patterns.js?v=8';
 
 /* ============================================================
  * 設定の保存
@@ -94,24 +94,41 @@ function heardNow() {
 const HANDS = ['L', 'R'];
 let problem = null; // { L: {ids, cells}, R: {ids, cells} }
 
-// 4拍パターンをランダムにつなげて、指定の拍数ぶんのリズムを作る
-function buildHand(patterns, beats) {
-  const ids = [];
-  const cells = [];
-  while (cells.length < beats) {
-    let i;
-    do { i = Math.floor(Math.random() * patterns.length); } while (ids.length && i === ids[ids.length - 1] - 1);
-    ids.push(i + 1);
-    cells.push(...patterns[i]);
+// 4拍パターンをランダムにつなげて、指定の拍数ぶんのリズムを作る。
+// 4拍ごとに、左右の難しさ(CELL_DIFFICULTY の合計)ができるだけ同じになるように選ぶ。
+const diffOf = (cells) => cells.reduce((a, c) => a + (CELL_DIFFICULTY[c] || 0), 0);
+const randOf = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function buildProblem(beats) {
+  const out = { L: { ids: [], cells: [] }, R: { ids: [], cells: [] } };
+  for (let start = 0; start < beats; start += 4) {
+    const len = Math.min(4, beats - start);
+    // どちらの手を先に決めるかもランダムに
+    const [first, second] = Math.random() < 0.5 ? ['L', 'R'] : ['R', 'L'];
+    const pats = { L: LEFT_PATTERNS, R: RIGHT_PATTERNS };
+    const lastId = (h) => out[h].ids[out[h].ids.length - 1];
+
+    const firstIdx = randOf(pats[first].map((_, i) => i).filter((i) => i + 1 !== lastId(first)));
+    const target = diffOf(pats[first][firstIdx].slice(0, len));
+
+    let best = Infinity, cands = [];
+    pats[second].forEach((p, i) => {
+      if (i + 1 === lastId(second)) return;
+      const d = Math.abs(diffOf(p.slice(0, len)) - target);
+      if (d < best) { best = d; cands = [i]; } else if (d === best) cands.push(i);
+    });
+    const secondIdx = randOf(cands);
+
+    for (const [h, idx] of [[first, firstIdx], [second, secondIdx]]) {
+      out[h].ids.push(idx + 1);
+      out[h].cells.push(...pats[h][idx].slice(0, len));
+    }
   }
-  return { ids, cells: cells.slice(0, beats) };
+  return out;
 }
 
 function newProblem() {
-  problem = {
-    L: buildHand(LEFT_PATTERNS, settings.beats),
-    R: buildHand(RIGHT_PATTERNS, settings.beats),
-  };
+  problem = buildProblem(settings.beats);
   const fmtIds = (ids) => ids.map((i) => `#${i}`).join(',');
   document.getElementById('patternInfo').textContent =
     `${settings.beats}拍 ・ 左 ${fmtIds(problem.L.ids)} / 右 ${fmtIds(problem.R.ids)}`;
@@ -647,5 +664,5 @@ window.__rhythm = {
     problem = { L: { ids: [], cells: L }, R: { ids: [], cells: R } };
     renderScore();
   },
-  state: () => ({ run, ctx }),
+  state: () => ({ run, ctx, problem }),
 };
