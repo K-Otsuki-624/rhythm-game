@@ -1,4 +1,4 @@
-import { RIGHT_PATTERNS, LEFT_PATTERNS } from './patterns.js?v=6';
+import { RIGHT_PATTERNS, LEFT_PATTERNS } from './patterns.js?v=7';
 
 /* ============================================================
  * 設定の保存
@@ -133,12 +133,6 @@ function parseCell(cell) {
       let j = i;
       while (j < 4 && cell[j] === '.') j++;
       let s = i;
-      if (i === 1 && j === 3 && cell[0] === 'x' && cell[3] === 'x') {
-        // 16分・8分休符・16分(16分-8分-16分 の形に合わせて8分休符を真ん中に置く)
-        tokens.push({ type: 'rest', slot: 1, dur: 2 });
-        i = j;
-        continue;
-      }
       while (s < j) {
         if (s % 2 === 0 && j - s >= 2) { tokens.push({ type: 'rest', slot: s, dur: 2 }); s += 2; }
         else { tokens.push({ type: 'rest', slot: s, dur: 1 }); s += 1; }
@@ -208,8 +202,7 @@ function drawCell(g, hand, row, cell) {
   for (const t of tokens) {
     const x = x0 + t.slot * SP;
     if (t.type === 'rest') {
-      const rx = t.dur === 2 && t.slot % 2 === 1 ? x + SP / 2 : x; // 真ん中の8分休符
-      drawRest(g, rx, by, t.dur);
+      drawRest(g, x, by, t.dur);
       continue;
     }
     const head = el('ellipse', {

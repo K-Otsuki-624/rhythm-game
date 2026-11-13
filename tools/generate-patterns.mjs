@@ -5,6 +5,7 @@
 // 1拍の表記: 4文字(16分音符ひとつ = 1文字)
 //   x = 音の頭(打つ)  - = 前の音の伸ばし  . = 休符
 // 使う音価: 4分・付点8分・8分・16分音符 / 8分・16分休符(4分休符 "...." は使わない)
+// 休符は拍の頭にだけ置く(音のあとに休符は入れず、次の音まで伸ばして書く)
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -14,8 +15,11 @@ function allCells() {
   const out = [];
   const rec = (s) => {
     if (s.length === 4) { if (s !== '....') out.push(s); return; }
+    // 休符は拍の頭(最初の音より前)だけ。音のあとの休符は音を伸ばす形にする
+    const started = s.includes('x');
     for (const c of ['x', '-', '.']) {
       if (c === '-' && !(s.endsWith('x') || s.endsWith('-'))) continue;
+      if (c === '.' && started) continue;
       rec(s + c);
     }
   };
