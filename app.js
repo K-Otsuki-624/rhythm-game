@@ -1,4 +1,4 @@
-import { RIGHT_PATTERNS, LEFT_PATTERNS, CELL_DIFFICULTY } from './patterns.js?v=8';
+import { PATTERNS, CELL_DIFFICULTY } from './patterns.js?v=9';
 
 /* ============================================================
  * 設定の保存
@@ -7,6 +7,7 @@ const STORE_KEY = 'rhythm-challenge-settings-v1';
 const defaults = {
   bpm: 90, subdiv: 1, metroInPlay: true, guide: false, tapSound: true,
   volume: 0.8, offset: 0, handMode: 'both', beats: 4,
+  rests: true, triplet: true,
 };
 let settings = { ...defaults };
 try {
@@ -99,13 +100,19 @@ let problem = null; // { L: {ids, cells}, R: {ids, cells} }
 const diffOf = (cells) => cells.reduce((a, c) => a + (CELL_DIFFICULTY[c] || 0), 0);
 const randOf = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+// 設定(休符あり/なし・三連符あり/なし)に合ったパターンのセット
+function currentSet() {
+  return PATTERNS[(settings.rests ? 'rest' : 'norest') + (settings.triplet ? '_triplet' : '')];
+}
+
 function buildProblem(beats) {
+  const set = currentSet();
   const out = { L: { ids: [], cells: [] }, R: { ids: [], cells: [] } };
   for (let start = 0; start < beats; start += 4) {
     const len = Math.min(4, beats - start);
     // どちらの手を先に決めるかもランダムに
     const [first, second] = Math.random() < 0.5 ? ['L', 'R'] : ['R', 'L'];
-    const pats = { L: LEFT_PATTERNS, R: RIGHT_PATTERNS };
+    const pats = set;
     const lastId = (h) => out[h].ids[out[h].ids.length - 1];
 
     const firstIdx = randOf(pats[first].map((_, i) => i).filter((i) => i + 1 !== lastId(first)));
@@ -136,23 +143,27 @@ function newProblem() {
   hideResult();
 }
 
-// 1拍(4文字)を音符・休符のトークンに分解
+// 1拍を音符・休符のトークンに分解
+//   4文字 = 16分音符グリッド, 3文字 = 8分三連符グリッド
+//   note: { slot, dur, flags(旗・桁の本数), dotted }  rest: { slot, glyph: '8' | '16' }
 function parseCell(cell) {
+  const len = cell.length;
   const tokens = [];
   let i = 0;
-  while (i < 4) {
+  while (i < len) {
     if (cell[i] === 'x') {
       let d = 1;
-      while (i + d < 4 && cell[i + d] === '-') d++;
-      tokens.push({ type: 'note', slot: i, dur: d });
+      while (i + d < len && cell[i + d] === '-') d++;
+      const flags = len === 4 ? (d === 1 ? 2 : d === 4 ? 0 : 1) : (d === 1 ? 1 : 0);
+      tokens.push({ type: 'note', slot: i, dur: d, flags, dotted: len === 4 && d === 3 });
       i += d;
     } else {
       let j = i;
-      while (j < 4 && cell[j] === '.') j++;
+      while (j < len && cell[j] === '.') j++;
       let s = i;
       while (s < j) {
-        if (s % 2 === 0 && j - s >= 2) { tokens.push({ type: 'rest', slot: s, dur: 2 }); s += 2; }
-        else { tokens.push({ type: 'rest', slot: s, dur: 1 }); s += 1; }
+        if (len === 4 && s % 2 === 0 && j - s >= 2) { tokens.push({ type: 'rest', slot: s, glyph: '8' }); s += 2; }
+        else { tokens.push({ type: 'rest', slot: s, glyph: len === 4 ? '16' : '8' }); s += 1; }
       }
       i = j;
     }
@@ -185,8 +196,8 @@ function el(name, attrs = {}, parent) {
 }
 const baseY = (row) => HEADER + row * ROWH + 58;
 
-function drawRest(g, cx, by, dur) {
-  if (dur === 2) {
+function drawRest(g, cx, by, glyph) {
+  if (glyph === '8') {
     el('circle', { cx: cx - 3, cy: by - 22, r: 3.4, class: 'ink' }, g);
     el('path', { d: `M${cx - 4},${by - 19} Q${cx + 1},${by - 16} ${cx + 5},${by - 24} L${cx - 1},${by - 1}`, class: 'stroke', 'stroke-width': 2.4 }, g);
   } else {
@@ -212,47 +223,64 @@ function drawFlag(g, sx, top, n) {
 function drawCell(g, hand, row, cell) {
   const by = baseY(row);
   const x0 = COL_X[hand] + NOTE_X0;
+  const len = cell.length;
+  const step = (SP * 4) / len; // 1文字ぶんの横幅(三連符は少し広い)
   const tokens = parseCell(cell);
   const notes = tokens.filter((t) => t.type === 'note');
   const top = by - STEM;
 
   for (const t of tokens) {
-    const x = x0 + t.slot * SP;
+    const x = x0 + t.slot * step;
     if (t.type === 'rest') {
-      drawRest(g, x, by, t.dur);
+      drawRest(g, x, by, t.glyph);
       continue;
     }
     const head = el('ellipse', {
       cx: x, cy: by, rx: 7.2, ry: 5.2, transform: `rotate(-22 ${x} ${by})`, class: 'nh',
     }, g);
-    noteEls[hand].push({ beat: row, slot: t.slot, el: head });
+    noteEls[hand].push({ beat: row, slot: t.slot, len, el: head });
     const sx = x + 6.2;
     el('line', { x1: sx, y1: by - 2, x2: sx, y2: top, class: 'stroke', 'stroke-width': 2 }, g);
-    if (t.dur === 3) el('circle', { cx: x + 13, cy: by + 1, r: 2.4, class: 'ink' }, g);
+    if (t.dotted) el('circle', { cx: x + 13, cy: by + 1, r: 2.4, class: 'ink' }, g);
   }
 
-  const short = notes.filter((n) => n.dur < 4);
-  const sxOf = (n) => x0 + n.slot * SP + 6.2;
+  const short = notes.filter((n) => n.flags > 0);
+  const sxOf = (n) => x0 + n.slot * step + 6.2;
   if (short.length === 1) {
     const n = short[0];
-    drawFlag(g, sxOf(n), top, n.dur === 1 ? 2 : 1);
+    drawFlag(g, sxOf(n), top, n.flags);
   } else if (short.length >= 2) {
     const first = short[0], last = short[short.length - 1];
     el('rect', { x: sxOf(first) - 1, y: top, width: sxOf(last) - sxOf(first) + 2, height: 5, class: 'ink', 'stroke-width': 0 }, g);
     const joined = new Set();
     for (let i = 0; i < short.length - 1; i++) {
       const a = short[i], b = short[i + 1];
-      if (a.dur === 1 && b.dur === 1 && b.slot - a.slot <= 2) {
+      if (a.flags === 2 && b.flags === 2 && b.slot - a.slot <= 2) {
         joined.add(a); joined.add(b);
         el('rect', { x: sxOf(a) - 1, y: top + 9, width: sxOf(b) - sxOf(a) + 2, height: 5, class: 'ink', 'stroke-width': 0 }, g);
       }
     }
     short.forEach((n, i) => {
-      if (n.dur !== 1 || joined.has(n)) return;
-      const len = 11;
-      const x = i === 0 ? sxOf(n) - 1 : sxOf(n) - len + 1;
-      el('rect', { x, y: top + 9, width: len, height: 5, class: 'ink', 'stroke-width': 0 }, g);
+      if (n.flags !== 2 || joined.has(n)) return;
+      const w = 11;
+      const x = i === 0 ? sxOf(n) - 1 : sxOf(n) - w + 1;
+      el('rect', { x, y: top + 9, width: w, height: 5, class: 'ink', 'stroke-width': 0 }, g);
     });
+  }
+
+  // 三連符の「3」: 8分3つが桁でつながっていれば数字だけ、それ以外はかぎ括弧つき
+  if (len === 3) {
+    const allBeamed = short.length === 3;
+    if (allBeamed) {
+      const cx = (sxOf(short[0]) + sxOf(short[2])) / 2;
+      const t = el('text', { x: cx, y: top - 4, 'text-anchor': 'middle', class: 'tuplet' }, g);
+      t.textContent = '3';
+    } else {
+      const xl = x0 - 6, xr = x0 + 2 * step + 12, y = top - 9, cx = (xl + xr) / 2;
+      el('path', { d: `M${xl},${y + 5} L${xl},${y} L${cx - 7},${y} M${cx + 7},${y} L${xr},${y} L${xr},${y + 5}`, class: 'stroke', 'stroke-width': 1.3 }, g);
+      const t = el('text', { x: cx, y: y + 4, 'text-anchor': 'middle', class: 'tuplet' }, g);
+      t.textContent = '3';
+    }
   }
 }
 
@@ -385,7 +413,7 @@ function startRun(kind) {
   for (const hand of HANDS) {
     if (!isHandActive(hand)) continue;
     noteEls[hand].forEach((n) => {
-      notes[hand].push({ t: t0 + (n.beat + n.slot / 4) * b, el: n.el, judged: null, dev: null });
+      notes[hand].push({ t: t0 + (n.beat + n.slot / n.len) * b, el: n.el, judged: null, dev: null });
     });
     notes[hand].sort((a, c) => a.t - c.t);
     if (kind === 'demo' || settings.guide) {
@@ -612,6 +640,8 @@ function updateButtons() {
   $('bpmSlider').disabled = running;
   $('handMode').disabled = running;
   $('beats').disabled = running;
+  $('rests').disabled = running;
+  $('triplet').disabled = running;
 }
 
 document.querySelectorAll('[data-bpm]').forEach((b) => {
@@ -630,6 +660,11 @@ if (beatsSel.options.length === 0) {
 settings.beats = Math.max(4, Math.min(20, Number(settings.beats) || 4));
 beatsSel.value = String(settings.beats);
 beatsSel.addEventListener('change', (e) => { settings.beats = Number(e.target.value); saveSettings(); newProblem(); });
+
+for (const key of ['rests', 'triplet']) {
+  $(key).value = settings[key] ? '1' : '0';
+  $(key).addEventListener('change', (e) => { settings[key] = e.target.value === '1'; saveSettings(); newProblem(); });
+}
 
 $('handMode').value = settings.handMode;
 $('handMode').addEventListener('change', (e) => { settings.handMode = e.target.value; saveSettings(); applyHandMode(); });

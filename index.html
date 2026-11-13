@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1e293b">
   <title>両手リズムチャレンジ</title>
   <!-- 更新したら ?v= の数字を上げる(ブラウザに古いファイルが残るのを防ぐ。app.js 内の patterns.js も同様) -->
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <header class="topbar">
@@ -31,9 +31,9 @@
         <button class="small" data-bpm="5">+5</button>
       </div>
       <input id="bpmSlider" type="range" min="30" max="240" step="1" value="90" aria-label="テンポ">
-      <div class="beats-row">
-        <label for="beats">拍数</label>
-        <select id="beats">
+      <div class="opt-row">
+        <label>拍数
+          <select id="beats">
           <option value="4" selected>4拍</option>
           <option value="5">5拍</option>
           <option value="6">6拍</option>
@@ -52,6 +52,19 @@
           <option value="19">19拍</option>
           <option value="20">20拍</option>
         </select>
+        </label>
+        <label>休符
+          <select id="rests">
+            <option value="1">あり</option>
+            <option value="0">なし</option>
+          </select>
+        </label>
+        <label>三連符
+          <select id="triplet">
+            <option value="1">あり</option>
+            <option value="0">なし</option>
+          </select>
+        </label>
       </div>
 
       <div class="main-buttons">
@@ -78,6 +91,7 @@
           <option value="1">4分音符</option>
           <option value="2">8分音符</option>
           <option value="4">16分音符</option>
+          <option value="3">8分三連符</option>
         </select>
       </div>
       <div class="setting">
@@ -112,6 +126,6 @@
     <button id="padR" class="pad pad-r" aria-label="右手"><span>右手</span><small>J</small></button>
   </footer>
 
-  <script type="module" src="app.js?v=8"></script>
+  <script type="module" src="app.js?v=9"></script>
 </body>
 </html>
