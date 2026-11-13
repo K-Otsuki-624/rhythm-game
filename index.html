@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#1e293b">
+  <title>両手リズムチャレンジ</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>両手リズムチャレンジ</h1>
+    <div id="patternInfo" class="pattern-info"></div>
+  </header>
+
+  <main>
+    <section class="paper-wrap">
+      <div id="score" class="paper" aria-label="楽譜"></div>
+      <div id="countdown" class="countdown" hidden></div>
+    </section>
+
+    <section id="result" class="result" hidden></section>
+
+    <section class="controls">
+      <div class="bpm-row">
+        <button class="small" data-bpm="-5">−5</button>
+        <button class="small" data-bpm="-1">−1</button>
+        <div class="bpm-display"><span id="bpmValue">90</span><small>BPM</small></div>
+        <button class="small" data-bpm="1">+1</button>
+        <button class="small" data-bpm="5">+5</button>
+      </div>
+      <input id="bpmSlider" type="range" min="30" max="240" step="1" value="90" aria-label="テンポ">
+
+      <div class="main-buttons">
+        <button id="btnNew" class="btn">🎲 新しい問題</button>
+        <button id="btnMetro" class="btn">🕒 メトロノーム</button>
+        <button id="btnDemo" class="btn">🔊 お手本</button>
+        <button id="btnChallenge" class="btn primary">▶ チャレンジ</button>
+      </div>
+    </section>
+
+    <details class="settings">
+      <summary>設定</summary>
+      <div class="setting">
+        <label for="handMode">練習する手</label>
+        <select id="handMode">
+          <option value="both">両手</option>
+          <option value="L">左手だけ</option>
+          <option value="R">右手だけ</option>
+        </select>
+      </div>
+      <div class="setting">
+        <label for="subdiv">メトロノームの刻み</label>
+        <select id="subdiv">
+          <option value="1">4分音符</option>
+          <option value="2">8分音符</option>
+          <option value="4">16分音符</option>
+        </select>
+      </div>
+      <div class="setting">
+        <label for="metroInPlay">チャレンジ中もメトロノームを鳴らす</label>
+        <input id="metroInPlay" type="checkbox" checked>
+      </div>
+      <div class="setting">
+        <label for="guide">チャレンジ中にお手本の音を鳴らす</label>
+        <input id="guide" type="checkbox">
+      </div>
+      <div class="setting">
+        <label for="tapSound">タップ音を鳴らす</label>
+        <input id="tapSound" type="checkbox" checked>
+      </div>
+      <div class="setting">
+        <label for="volume">音量</label>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.8">
+      </div>
+      <div class="setting">
+        <label for="offset">タイミング補正 <span id="offsetValue">0</span> ms</label>
+        <input id="offset" type="range" min="-200" max="200" step="5" value="0">
+      </div>
+      <p class="hint">
+        判定がいつも「遅い」ならプラス方向へ、「早い」ならマイナス方向へ補正します(Bluetoothイヤホンは遅延が大きいので補正推奨)。<br>
+        キーボード: 左手 = <kbd>F</kbd> <kbd>D</kbd> / 右手 = <kbd>J</kbd> <kbd>K</kbd>
+      </p>
+    </details>
+  </main>
+
+  <footer class="pads">
+    <button id="padL" class="pad pad-l" aria-label="左手"><span>左手</span><small>F</small></button>
+    <button id="padR" class="pad pad-r" aria-label="右手"><span>右手</span><small>J</small></button>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
