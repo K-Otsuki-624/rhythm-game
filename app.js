@@ -6,7 +6,7 @@ import { RIGHT_PATTERNS, LEFT_PATTERNS } from './patterns.js';
 const STORE_KEY = 'rhythm-challenge-settings-v1';
 const defaults = {
   bpm: 90, subdiv: 1, metroInPlay: true, guide: false, tapSound: true,
-  volume: 0.8, offset: 0, handMode: 'both',
+  volume: 0.8, offset: 0, handMode: 'both', beats: 4,
 };
 let settings = { ...defaults };
 try {
@@ -92,16 +92,29 @@ function heardNow() {
  * 問題
  * ============================================================ */
 const HANDS = ['L', 'R'];
-let problem = null; // { L: {id, cells}, R: {id, cells} }
+let problem = null; // { L: {ids, cells}, R: {ids, cells} }
+
+// 4拍パターンをランダムにつなげて、指定の拍数ぶんのリズムを作る
+function buildHand(patterns, beats) {
+  const ids = [];
+  const cells = [];
+  while (cells.length < beats) {
+    let i;
+    do { i = Math.floor(Math.random() * patterns.length); } while (ids.length && i === ids[ids.length - 1] - 1);
+    ids.push(i + 1);
+    cells.push(...patterns[i]);
+  }
+  return { ids, cells: cells.slice(0, beats) };
+}
 
 function newProblem() {
-  const li = Math.floor(Math.random() * LEFT_PATTERNS.length);
-  let ri = Math.floor(Math.random() * RIGHT_PATTERNS.length);
   problem = {
-    L: { id: li + 1, cells: LEFT_PATTERNS[li] },
-    R: { id: ri + 1, cells: RIGHT_PATTERNS[ri] },
+    L: buildHand(LEFT_PATTERNS, settings.beats),
+    R: buildHand(RIGHT_PATTERNS, settings.beats),
   };
-  document.getElementById('patternInfo').textContent = `左 #${problem.L.id} / 右 #${problem.R.id}`;
+  const fmtIds = (ids) => ids.map((i) => `#${i}`).join(',');
+  document.getElementById('patternInfo').textContent =
+    `${settings.beats}拍 ・ 左 ${fmtIds(problem.L.ids)} / 右 ${fmtIds(problem.R.ids)}`;
   renderScore();
   hideResult();
 }
@@ -141,7 +154,8 @@ const SP = 34;         // 16分音符ひとつぶんの横幅
 const NOTE_X0 = 38;    // 列内での最初の音符の x
 const STEM = 38;
 const W = COLW * 2;
-const H = HEADER + ROWH * 4 + 8;
+let rows = 4;
+const svgH = () => HEADER + ROWH * rows + 8;
 const COL_X = { L: 0, R: COLW };
 
 let svg, noteEls, rowHl, playheads, colGroups;
@@ -223,6 +237,8 @@ function drawCell(g, hand, row, cell) {
 function renderScore() {
   const host = document.getElementById('score');
   host.innerHTML = '';
+  rows = problem.L.cells.length;
+  const H = svgH();
   svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img' });
   host.appendChild(svg);
   noteEls = { L: [], R: [] };
@@ -230,8 +246,13 @@ function renderScore() {
   playheads = { L: null, R: null };
   colGroups = {};
 
-  for (let r = 0; r < 4; r++) {
+  for (let r = 0; r < rows; r++) {
     rowHl.push(el('rect', { x: 0, y: HEADER + r * ROWH, width: W, height: ROWH, class: 'row-hl' }, svg));
+  }
+  // 4拍ごとの区切り線
+  for (let r = 4; r < rows; r += 4) {
+    const y = HEADER + r * ROWH;
+    el('line', { x1: 6, y1: y, x2: W - 6, y2: y, class: 'bar-sep' }, svg);
   }
   el('line', { x1: COLW, y1: 8, x2: COLW, y2: H - 6, stroke: '#333', 'stroke-width': 1.3 }, svg);
 
@@ -240,7 +261,7 @@ function renderScore() {
     colGroups[hand] = g;
     const t = el('text', { x: COL_X[hand] + COLW / 2, y: 23, 'text-anchor': 'middle', class: 'lbl' }, g);
     t.textContent = hand === 'L' ? '左手' : '右手';
-    for (let r = 0; r < 4; r++) {
+    for (let r = 0; r < rows; r++) {
       if (hand === 'L') {
         const n = el('text', { x: 10, y: baseY(r) - 12, class: 'rownum' }, g);
         n.textContent = r + 1;
@@ -328,12 +349,13 @@ function startRun(kind) {
   const t0 = ctx.currentTime + 0.15 + 4 * b; // 本番の1拍目
   const events = [];
   // カウントイン
+  const nBeats = rows;
   for (let i = 0; i < 4; i++) events.push({ t: t0 - (4 - i) * b, fn: (t) => click(t, i === 0 ? 0 : 1) });
   // 本番中のメトロノーム
   if (kind === 'demo' || settings.metroInPlay) {
     const sub = settings.subdiv;
-    for (let i = 0; i < 4 * sub; i++) {
-      events.push({ t: t0 + i * (b / sub), fn: (t) => click(t, i === 0 ? 0 : i % sub === 0 ? 1 : 2) });
+    for (let i = 0; i < nBeats * sub; i++) {
+      events.push({ t: t0 + i * (b / sub), fn: (t) => click(t, i % (4 * sub) === 0 ? 0 : i % sub === 0 ? 1 : 2) });
     }
   }
   // 正解ノート
@@ -355,8 +377,11 @@ function startRun(kind) {
     perfectWin: Math.min(0.05, sixteenth * 0.4),
     goodWin: Math.min(0.12, sixteenth * 0.5),
     extra: { L: 0, R: 0 },
-    end: t0 + 4 * b,
+    end: t0 + nBeats * b,
+    nBeats,
+    curRow: -1,
   };
+  scrollToRow(0);
 
   startTimer(() => {
     if (!run) return;
@@ -367,6 +392,18 @@ function startRun(kind) {
   });
   raf = requestAnimationFrame(frame);
   updateButtons();
+}
+
+// いま叩いている段と次の段が画面に入るようにスクロール
+function scrollToRow(r) {
+  if (!rowHl[r]) return;
+  const topLimit = 8;
+  const bottomLimit = document.querySelector('.pads').getBoundingClientRect().top - 8;
+  const cur = rowHl[r].getBoundingClientRect();
+  const next = rowHl[Math.min(r + 1, rows - 1)].getBoundingClientRect();
+  if (cur.top < topLimit || next.bottom > bottomLimit) {
+    window.scrollBy({ top: cur.top - topLimit - 4, behavior: 'smooth' });
+  }
 }
 
 function frame() {
@@ -383,10 +420,15 @@ function frame() {
     cd.hidden = true;
   }
   const pos = (now - t0) / b; // 本番内の拍位置
-  for (let r = 0; r < 4; r++) rowHl[r].classList.toggle('on', pos >= r && pos < r + 1);
+  for (let r = 0; r < rows; r++) rowHl[r].classList.toggle('on', pos >= r && pos < r + 1);
+  const curRow = Math.floor(pos);
+  if (curRow !== run.curRow && curRow >= 0 && curRow < run.nBeats) {
+    run.curRow = curRow;
+    scrollToRow(curRow);
+  }
   for (const hand of HANDS) {
     const ph = playheads[hand];
-    if (pos >= 0 && pos < 4) {
+    if (pos >= 0 && pos < run.nBeats) {
       const r = Math.floor(pos);
       const x = COL_X[hand] + NOTE_X0 - 10 + (pos - r) * 4 * SP;
       ph.setAttribute('x1', x); ph.setAttribute('x2', x);
@@ -544,6 +586,7 @@ function updateButtons() {
   document.querySelectorAll('[data-bpm]').forEach((b) => (b.disabled = running));
   $('bpmSlider').disabled = running;
   $('handMode').disabled = running;
+  $('beats').disabled = running;
 }
 
 document.querySelectorAll('[data-bpm]').forEach((b) => {
@@ -554,6 +597,12 @@ $('btnNew').addEventListener('click', () => newProblem());
 $('btnMetro').addEventListener('click', () => (mode === 'metronome' ? stopAll() : startMetronome()));
 $('btnDemo').addEventListener('click', () => (mode === 'demo' ? stopAll() : startRun('demo')));
 $('btnChallenge').addEventListener('click', () => (mode === 'challenge' ? stopAll() : startRun('challenge')));
+
+const beatsSel = $('beats');
+for (let n = 4; n <= 20; n++) beatsSel.add(new Option(`${n}拍`, String(n)));
+settings.beats = Math.max(4, Math.min(20, Number(settings.beats) || 4));
+beatsSel.value = String(settings.beats);
+beatsSel.addEventListener('change', (e) => { settings.beats = Number(e.target.value); saveSettings(); newProblem(); });
 
 $('handMode').value = settings.handMode;
 $('handMode').addEventListener('change', (e) => { settings.handMode = e.target.value; saveSettings(); applyHandMode(); });
@@ -585,7 +634,7 @@ updateButtons();
 // デバッグ用: 任意の拍の組み合わせを表示する
 window.__rhythm = {
   show(L, R) {
-    problem = { L: { id: 0, cells: L }, R: { id: 0, cells: R } };
+    problem = { L: { ids: [], cells: L }, R: { ids: [], cells: R } };
     renderScore();
   },
   state: () => ({ run, ctx }),
