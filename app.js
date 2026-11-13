@@ -133,6 +133,12 @@ function parseCell(cell) {
       let j = i;
       while (j < 4 && cell[j] === '.') j++;
       let s = i;
+      if (i === 1 && j === 3 && cell[0] === 'x' && cell[3] === 'x') {
+        // 16分・8分休符・16分(16分-8分-16分 の形に合わせて8分休符を真ん中に置く)
+        tokens.push({ type: 'rest', slot: 1, dur: 2 });
+        i = j;
+        continue;
+      }
       while (s < j) {
         if (s % 2 === 0 && j - s >= 2) { tokens.push({ type: 'rest', slot: s, dur: 2 }); s += 2; }
         else { tokens.push({ type: 'rest', slot: s, dur: 1 }); s += 1; }
@@ -152,7 +158,7 @@ const HEADER = 34;
 const ROWH = 78;
 const SP = 34;         // 16分音符ひとつぶんの横幅
 const NOTE_X0 = 38;    // 列内での最初の音符の x
-const STEM = 38;
+const STEM = 44;
 const W = COLW * 2;
 let rows = 4;
 const svgH = () => HEADER + ROWH * rows + 8;
@@ -182,10 +188,12 @@ function drawRest(g, cx, by, dur) {
 
 function drawFlag(g, sx, top, n) {
   for (let k = 0; k < n; k++) {
-    const y = top + k * 9;
+    const y = top + k * 10;
+    const len = n === 1 ? 24 : (k === 0 ? 17 : 20); // 16分の旗は上を短くして重ならないように
     el('path', {
-      d: `M${sx},${y} C${sx + 2},${y + 8} ${sx + 13},${y + 9} ${sx + 9},${y + 22} C${sx + 10},${y + 12} ${sx + 3},${y + 12} ${sx},${y + 10} Z`,
-      class: 'ink', 'stroke-width': 0.6,
+      d: `M${sx},${y} C${sx + 1},${y + 6} ${sx + 12},${y + 8} ${sx + 10},${y + len}`
+        + ` C${sx + 8},${y + len * 0.6} ${sx + 3},${y + 13} ${sx},${y + 11} Z`,
+      class: 'ink', 'stroke-width': 0.4,
     }, g);
   }
 }
@@ -199,7 +207,11 @@ function drawCell(g, hand, row, cell) {
 
   for (const t of tokens) {
     const x = x0 + t.slot * SP;
-    if (t.type === 'rest') { drawRest(g, x, by, t.dur); continue; }
+    if (t.type === 'rest') {
+      const rx = t.dur === 2 && t.slot % 2 === 1 ? x + SP / 2 : x; // 真ん中の8分休符
+      drawRest(g, rx, by, t.dur);
+      continue;
+    }
     const head = el('ellipse', {
       cx: x, cy: by, rx: 7.2, ry: 5.2, transform: `rotate(-22 ${x} ${by})`, class: 'nh',
     }, g);
@@ -220,7 +232,7 @@ function drawCell(g, hand, row, cell) {
     const joined = new Set();
     for (let i = 0; i < short.length - 1; i++) {
       const a = short[i], b = short[i + 1];
-      if (a.dur === 1 && b.dur === 1) {
+      if (a.dur === 1 && b.dur === 1 && b.slot - a.slot <= 2) {
         joined.add(a); joined.add(b);
         el('rect', { x: sxOf(a) - 1, y: top + 9, width: sxOf(b) - sxOf(a) + 2, height: 5, class: 'ink', 'stroke-width': 0 }, g);
       }
